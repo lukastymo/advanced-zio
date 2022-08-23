@@ -49,8 +49,8 @@ object InterruptGuarantees extends ZIOSpecDefault {
         _       <- latch.await // await until fiber starts before interrupting
         _       <- fiber.interrupt
         v       <- ref.get
-      } yield assertTrue(v == 0)
-    } @@ ignore +
+      } yield assertTrue(v == 1)
+    } +
       test("onExit") {
 
         /**
@@ -67,7 +67,7 @@ object InterruptGuarantees extends ZIOSpecDefault {
           _       <- fiber.interrupt
           exit    <- promise.await
         } yield assertTrue(false)
-      } @@ ignore +
+      } +
       test("acquireRelease") {
         import java.net.Socket
 
@@ -219,8 +219,8 @@ object BasicDerived extends ZIOSpecDefault {
             latch   <- Promise.make[Nothing, Unit]
             promise <- Promise.make[Nothing, Unit]
             ref     <- Ref.make(false)
-            fiber <- acquireReleaseWith(latch.succeed(()) *> Live.live(ZIO.sleep(10.millis)))(_ => ref.set(true))(
-                      _ => promise.await
+            fiber <- acquireReleaseWith(latch.succeed(()) *> Live.live(ZIO.sleep(10.millis)))(_ => ref.set(true))(_ =>
+                      promise.await
                     ).forkDaemon
             _ <- latch.await
             _ <- fiber.interrupt
@@ -326,8 +326,8 @@ object Graduation extends ZIOSpecDefault {
             latch   <- Promise.make[Nothing, Unit]
             promise <- Promise.make[Nothing, Unit]
             ref     <- Ref.make(false)
-            fiber <- acquireReleaseWith(latch.succeed(()) *> Live.live(ZIO.sleep(10.millis)))(_ => ref.set(true))(
-                      _ => promise.await
+            fiber <- acquireReleaseWith(latch.succeed(()) *> Live.live(ZIO.sleep(10.millis)))(_ => ref.set(true))(_ =>
+                      promise.await
                     ).forkDaemon
             _ <- latch.await
             _ <- fiber.interrupt

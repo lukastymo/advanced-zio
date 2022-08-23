@@ -192,8 +192,8 @@ object StmBasics extends ZIOSpecDefault {
           for {
             counter <- Ref.make(0)
             permits <- makePermits(100)
-            _ <- ZIO.foreachPar(1 to 1000)(
-                  _ => Random.nextIntBetween(1, 2).flatMap(n => permits.acquire(n) *> permits.release(n))
+            _ <- ZIO.foreachPar(1 to 1000)(_ =>
+                  Random.nextIntBetween(1, 2).flatMap(n => permits.acquire(n) *> permits.release(n))
                 )
             latch   <- Promise.make[Nothing, Unit]
             fiber   <- (latch.succeed(()) *> permits.acquire(101) *> counter.set(1)).forkDaemon
@@ -232,12 +232,8 @@ object HubBasics extends ZIOSpecDefault {
           latch   <- TRef.make(100).commit
           scount  <- Ref.make[Int](0)
           _       <- (latch.get.retryUntil(_ <= 0).commit *> ZIO.foreach(1 to 100)(hub.publish(_))).forkDaemon
-          _ <- ZIO.foreachPar(1 to 100) { _ =>
-                ZIO.scoped(hub.subscribe.flatMap { queue =>
-                  latch.update(_ - 1).commit
-                })
-              }
-          value <- counter.get
+          _       <- ZIO.foreachPar(1 to 100)(_ => ZIO.scoped(hub.subscribe.flatMap(queue => latch.update(_ - 1).commit)))
+          value   <- counter.get
         } yield assertTrue(value == 505000)
       } @@ ignore
     }
