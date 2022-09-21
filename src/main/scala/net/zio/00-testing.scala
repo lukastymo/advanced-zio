@@ -31,7 +31,18 @@ object SimplestSpec extends ZIOSpecDefault {
    *
    * Using sbt or your IDE, run `SimplestSpec` by using its `main` function (not the test runner).
    */
-  def spec = suite("SimplestSpec")()
+  def spec = suite("SimplestSpec")(
+    test("simple test") {
+      for {
+        result  <- ZIO.succeed(2 + 2)
+        _       <- assertTrue(result == 4)
+        result2 <- ZIO.succeed(2 + 3)
+        _       <- assertTrue(result2 == 6)
+      } yield {
+        assertTrue(result == 4)
+      }
+    }
+  )
 }
 
 /**
@@ -65,7 +76,7 @@ object BasicAssertions extends ZIOSpecDefault {
        *
        * Using `assertTrue`, assert that 2 + 2 == 4.
        */
-      assertTrue(false)
+      assertTrue(2 + 2 == 4)
     } +
       test("sherlock misspelling") {
 
@@ -74,7 +85,7 @@ object BasicAssertions extends ZIOSpecDefault {
          *
          * Examine the output of this failed test. Then fix the test so that it passes.
          */
-        assertTrue("sherlock".contains("sure"))
+        assertTrue("sherlock".contains("lock"))
       } +
       test("multiple assertions") {
         val string = "cannac"
@@ -89,15 +100,22 @@ object BasicAssertions extends ZIOSpecDefault {
          *  - the string starts with "can"
          *  - the reverse of the string is equal to itself
          */
-        assertTrue(false)
+        assertTrue(string.length == 6) &&
+        assertTrue(string.startsWith("can")) &&
+        assertTrue(string.reverse == string)
+      } +
+      test("another test") {
+
+        /**
+         * EXERCISE
+         *
+         * Using `+`, add another test to the suite, which you can create with
+         * `test`, as above. This test should verify that the contents of one
+         * of the buildings in `buildings` contains a `needle`.
+         */
+        assertTrue(buildings.exists(_.contents.contains("needle")))
       }
-    /**
-   * EXERCISE
-   *
-   * Using `+`, add another test to the suite, which you can create with
-   * `test`, as above. This test should verify that the contents of one
-   * of the buildings in `buildings` contains a `needle`.
-   */
+
   }
 }
 
@@ -120,7 +138,7 @@ object BasicAssertionsZIO extends ZIOSpecDefault {
       for {
         ref <- Ref.make(0)
         v   <- ref.updateAndGet(_ + 1)
-      } yield assertTrue(false)
+      } yield assertTrue(v == 1)
     } +
       test("multiple assertions") {
 
@@ -136,8 +154,8 @@ object BasicAssertionsZIO extends ZIOSpecDefault {
         for {
           ref  <- Ref.make(0)
           rand <- Random.nextIntBetween(1, 4)
-          v    <- ref.updateAndGet(_ + 1).repeatN(rand * 2)
-        } yield assertTrue(false)
+          v    <- ref.updateAndGet(x => (x + 1) * 2).repeatN(rand + 1)
+        } yield assertTrue(v % 2 == 0) && assertTrue(v > 0)
       }
   }
 }
@@ -166,7 +184,7 @@ object BasicTestAspects extends ZIOSpecDefault {
        * the failure is ignored.
        */
       assertTrue(false)
-    } +
+    } @@ ignore +
       test("flaky") {
 
         /**
@@ -178,7 +196,7 @@ object BasicTestAspects extends ZIOSpecDefault {
         for {
           number <- Random.nextInt
         } yield assertTrue(number % 2 == 0)
-      } +
+      } @@ flaky +
       test("nonFlaky") {
 
         /**
@@ -190,7 +208,7 @@ object BasicTestAspects extends ZIOSpecDefault {
         for {
           number <- Random.nextIntBetween(0, 100)
         } yield assertTrue(number * 2 % 2 == 0)
-      } +
+      } @@ nonFlaky +
       /**
        * EXERCISE
        *
@@ -208,7 +226,7 @@ object BasicTestAspects extends ZIOSpecDefault {
             for {
               _ <- Console.printLine("Test 2")
             } yield assertTrue(true)
-          }
+          } @@ sequential
       }
   }
 }
@@ -239,7 +257,7 @@ object TestFixtures extends ZIOSpecDefault {
       for {
         value <- ZIO.succeed(beforeRef.get)
       } yield assertTrue(value > 0)
-    } @@ ignore +
+    } @@ TestAspect.before(incBeforeRef) +
       /**
        * EXERCISE
        *
@@ -250,7 +268,7 @@ object TestFixtures extends ZIOSpecDefault {
         for {
           _ <- Console.printLine("after")
         } yield assertTrue(true)
-      } @@ ignore +
+      } @@ TestAspect.after(incBeforeRef) +
       /**
        * EXERCISE
        *
@@ -261,7 +279,10 @@ object TestFixtures extends ZIOSpecDefault {
         for {
           value <- ZIO.succeed(aroundRef.get)
         } yield assertTrue(value == 1)
-      } @@ ignore
+      } @@ TestAspect.around(
+        ZIO.succeed(aroundRef.incrementAndGet()),
+        ZIO.succeed(aroundRef.decrementAndGet())
+      )
   }
 }
 
@@ -286,9 +307,10 @@ object TestServices extends ZIOSpecDefault {
       test("TestClock") {
         for {
           fiber <- Clock.sleep(1.second).as(42).fork
+          _     <- TestClock.adjust(1.second)
           value <- fiber.join
         } yield assertTrue(value == 42)
-      } @@ ignore +
+      } +
         /**
          * EXERCISE
          *
@@ -297,9 +319,10 @@ object TestServices extends ZIOSpecDefault {
          */
         test("TestSystem") {
           for {
+            _    <- TestSystem.putEnv("name", "Sherlock Holmes")
             name <- System.env("name").some
           } yield assertTrue(name == "Sherlock Holmes")
-        } @@ ignore +
+        } +
         /**
          * EXERCISE
          *
@@ -309,9 +332,10 @@ object TestServices extends ZIOSpecDefault {
         test("TestConsole") {
           for {
             _    <- Console.printLine("What is your name?")
+            _    <- TestConsole.feedLines("Sherlock Holmes")
             name <- Console.readLine
           } yield assertTrue(name == "Sherlock Holmes")
-        } @@ ignore +
+        } +
         /**
          * EXERCISE
          *
@@ -328,7 +352,7 @@ object TestServices extends ZIOSpecDefault {
             result <- if (guess == number.toString) Console.printLine("Good job!").as(true)
                      else Console.printLine("Try again!").as(false)
           } yield assertTrue(result)
-        } @@ ignore +
+        } +
         /**
          * EXERCISE
          *
@@ -339,9 +363,9 @@ object TestServices extends ZIOSpecDefault {
          */
         test("Live") {
           for {
-            now <- Clock.instant.map(_.getEpochSecond())
+            now <- Live.live(Clock.instant.map(_.getEpochSecond()))
           } yield assertTrue(now > 0)
-        } @@ ignore
+        }
     }
 }
 
@@ -359,7 +383,7 @@ object IntegrationSystem extends ZIOSpecDefault {
    * Explore jvmOnly, windows, linux, ifEnv, and other test aspects that
    * are useful for running platform-specific or integration / system tests.
    */
-  def spec = suite("IntegrationSystem")()
+  def spec = suite("IntegrationSystem")() @@ TestAspect.ifEnvSet("STAGING_CI")
 }
 
 /**
@@ -412,7 +436,15 @@ object CustomLayers extends ZIOSpecDefault {
    *
    * Create a test user repo layer and populate it with some test data.
    */
-  lazy val testUserRepo: ULayer[UserRepo] = ???
+  lazy val testUserRepo: ULayer[UserRepo] = ZLayer {
+    for {
+      ref <- Ref.make[Map[String, User]](
+              Map(
+                "1" -> User("1", "John", 25)
+              )
+            )
+    } yield TestUserRepo(ref)
+  }
 
   def spec =
     suite("CustomLayers") {
@@ -428,11 +460,10 @@ object CustomLayers extends ZIOSpecDefault {
          * Finally, to make the test pass, you will have to create test
          * data matches your test expectations.
          */
-        // for {
-        //   user <- UserRepo.getUserById("sherlock@holmes.com").some
-        // } yield assertTrue(user.age == 42)
-        assertTrue(false)
-      } @@ ignore +
+        for {
+          user <- UserRepo.getUserById("sherlock@holmes.com").some
+        } yield assertTrue(user.age == 42)
+      }.provide(testUserRepo) +
         /**
          * EXERCISE
          *
@@ -449,7 +480,7 @@ object CustomLayers extends ZIOSpecDefault {
             test("getting a user") {
               assertTrue(false)
             }
-        } @@ sequential @@ ignore
+        }.provideCustomLayerShared(testUserRepo) @@ sequential
     }
 }
 
