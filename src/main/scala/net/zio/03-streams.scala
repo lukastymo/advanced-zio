@@ -402,9 +402,8 @@ object AdvancedOperators extends ZIOSpecDefault {
             _      <- TestConsole.feedLines("Sherlock Holmes", "42")
             values <- questions.runCollect
             lines  <- TestConsole.output
-          } yield
-            assertTrue(values == Chunk("Sherlock Holmes", "42")) &&
-              assertTrue(lines == Vector("What is your name?\n", "What is your age?\n"))
+          } yield assertTrue(values == Chunk("Sherlock Holmes", "42")) &&
+            assertTrue(lines == Vector("What is your name?\n", "What is your age?\n"))
         } @@ ignore +
         /**
          * EXERCISE
